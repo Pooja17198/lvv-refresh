@@ -40,7 +40,7 @@ const pageChangeHandler = (route: Route) => {
 // ─── Session constants ────────────────────────────────────────────────────────
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 60 * 1000; // 5 hours inactivity → logout
 const WARNING_BEFORE_MS     = 5 * 60 * 1000;       // show warning 5 min before logout
-const TOKEN_REFRESH_MS      = 20 * 60 * 1000;      // refresh IDCS token every 20 min
+const TOKEN_REFRESH_MS      = 19 * 60 * 1000;     // refresh IDCS token every 19 min
 // (IDCS token expires in 60 min;
 //  refresh token expires in 8 hrs)
 const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
