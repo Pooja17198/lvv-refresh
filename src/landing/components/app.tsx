@@ -41,6 +41,7 @@ const pageChangeHandler = (route: Route) => {
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 60 * 1000; // 5 hours inactivity → logout
 const WARNING_BEFORE_MS     = 5 * 60 * 1000;       // show warning 5 min before logout
 const TOKEN_REFRESH_MS      = 19 * 60 * 1000;     // refresh IDCS token every 19 min
+const RELAUNCH_AUTH_URL     = "/logout";          // force fresh login flow
 // (IDCS token expires in 60 min;
 //  refresh token expires in 8 hrs)
 const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
@@ -58,7 +59,8 @@ export const App = registerCustomElement("app-root", (props: Props) => {
     const inactivityTimer   = useRef<ReturnType<typeof setTimeout>  | null>(null);
     const warningTimer      = useRef<ReturnType<typeof setTimeout>  | null>(null);
     const tokenRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-    const iframeRef         = useRef<HTMLIFrameElement | null>(null);
+    const refreshInFlightRef = useRef(false);
+    const redirectingRef     = useRef(false);
 
     // FIX: useRef mirror of showSessionWarning so that the event listener
     // registered once in useEffect always reads the *current* value.
@@ -73,17 +75,46 @@ export const App = registerCustomElement("app-root", (props: Props) => {
     const vendorChangedHandler = (vendor: string) => setSelectedVendor(vendor);
     const regionChangedHandler = (region: string) => setSelectedRegion(region);
 
-    // ─── Token refresh (SPLAT/IDCS iframe — per SPLAT OIDC docs) ────────────────
-    const refreshToken = () => {
-        if (iframeRef.current) {
-            // cache-bust with timestamp so browser always makes a real request
-            iframeRef.current.src = `/callback?refresh&_=${Date.now()}`;
+    const redirectToLogin = () => {
+        if (redirectingRef.current) return;
+        redirectingRef.current = true;
+        clearTimers();
+        stopTokenRefresh();
+        warningVisibleRef.current = false;
+        setShowSessionWarning(false);
+        window.location.assign(RELAUNCH_AUTH_URL);
+    };
+
+    // ─── Token refresh (SPLAT/IDCS callback) ────────────────────────────────────
+    const refreshToken = async () => {
+        if (refreshInFlightRef.current || redirectingRef.current) return;
+        refreshInFlightRef.current = true;
+        const refreshUrl = `/callback?refresh&_=${Date.now()}`;
+
+        try {
+            const response = await fetch(refreshUrl, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                redirect: "follow",
+            });
+
+            if (!response.ok) {
+                throw new Error(`Refresh failed with status ${response.status}`);
+            }
+        } catch (err) {
+            console.error("Token refresh failed, redirecting to login.", err);
+            redirectToLogin();
+        } finally {
+            refreshInFlightRef.current = false;
         }
     };
 
     const startTokenRefresh = () => {
-        refreshToken(); // immediate refresh on mount
-        tokenRefreshTimer.current = setInterval(refreshToken, TOKEN_REFRESH_MS);
+        void refreshToken(); // immediate refresh on mount
+        tokenRefreshTimer.current = setInterval(() => {
+            void refreshToken();
+        }, TOKEN_REFRESH_MS);
     };
 
     const stopTokenRefresh = () => {
@@ -110,7 +141,7 @@ export const App = registerCustomElement("app-root", (props: Props) => {
         inactivityTimer.current = setTimeout(() => {
             warningVisibleRef.current = false;
             setShowSessionWarning(false);
-            window.location.href = "/logout";
+            redirectToLogin();
         }, INACTIVITY_TIMEOUT_MS);
     };
 
@@ -168,15 +199,6 @@ export const App = registerCustomElement("app-root", (props: Props) => {
             />
             <Footer />
 
-            {/* Hidden iframe — triggers SPLAT's OIDC token refresh every 20 min */}
-            <iframe
-                ref={iframeRef}
-                id="refresh_target"
-                src=""
-                frameBorder={0}
-                style={{ display: "none" }}
-            />
-
             {/* Session expiry warning modal */}
             {showSessionWarning && (
                 <div style={{
@@ -203,7 +225,7 @@ export const App = registerCustomElement("app-root", (props: Props) => {
                             Stay Logged In
                         </button>
                         <button
-                            onClick={() => window.location.href = "/logout"}
+                            onClick={redirectToLogin}
                             style={{
                                 padding: "8px 20px",
                                 background: "#f5f5f5", color: "#333",
