@@ -40,6 +40,7 @@ const pageChangeHandler = (route: Route) => {
 // ─── Session constants ────────────────────────────────────────────────────────
 const TOKEN_REFRESH_MS      = 19 * 60 * 1000;     // refresh IDCS token every 19 min
 const RELAUNCH_AUTH_URL     = "/";                // force OIDC challenge via protected route
+const TEST_AUTO_LOGOUT_MS   = 15 * 60 * 1000;     // test-only: force re-login after 15 minutes
 // (IDCS token expires in 60 min;
 //  refresh token expires in 8 hrs)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ export const App = registerCustomElement("app-root", (props: Props) => {
     props.userLogin = sessionStorage.getItem("X-Oracle-Vendor-Email") || "";
 
     const tokenRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+    const testLogoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const refreshInFlightRef = useRef(false);
     const redirectingRef     = useRef(false);
 
@@ -105,6 +107,18 @@ export const App = registerCustomElement("app-root", (props: Props) => {
     const stopTokenRefresh = () => {
         if (tokenRefreshTimer.current) clearInterval(tokenRefreshTimer.current);
     };
+
+    const startTestAutoLogout = () => {
+        if (testLogoutTimer.current) clearTimeout(testLogoutTimer.current);
+        testLogoutTimer.current = setTimeout(() => {
+            console.warn("Test auto-logout fired after 15 minutes.");
+            redirectToLogin();
+        }, TEST_AUTO_LOGOUT_MS);
+    };
+
+    const stopTestAutoLogout = () => {
+        if (testLogoutTimer.current) clearTimeout(testLogoutTimer.current);
+    };
     // ─────────────────────────────────────────────────────────────────────────────
 
     useEffect(() => {
@@ -114,9 +128,11 @@ export const App = registerCustomElement("app-root", (props: Props) => {
         router.sync();
 
         startTokenRefresh();
+        startTestAutoLogout();
 
         return () => {
             stopTokenRefresh();
+            stopTestAutoLogout();
         };
     }, []); // runs once on mount
 
