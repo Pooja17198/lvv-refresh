@@ -39,7 +39,7 @@ const pageChangeHandler = (route: Route) => {
 
 // ─── Session constants ────────────────────────────────────────────────────────
 const TOKEN_REFRESH_MS      = 19 * 60 * 1000;     // refresh IDCS token every 19 min
-const RELAUNCH_AUTH_URL     = "/logout";          // force fresh login flow
+const RELAUNCH_AUTH_URL     = "/";                // force OIDC challenge via protected route
 // (IDCS token expires in 60 min;
 //  refresh token expires in 8 hrs)
 // ─────────────────────────────────────────────────────────────────────────────
