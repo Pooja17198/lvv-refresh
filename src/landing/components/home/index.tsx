@@ -97,18 +97,21 @@ const HomeContainer = (props: Props) => {
     const [selectedProject, setSelectedProject] = useState(
         INIT_SELECTEDPROJECT
     );
+    const [selectedProjectRegion, setSelectedProjectRegion] = useState<string | null>(null);
 
     // Reset selectedProject to initial state whenever region changes
     useEffect(() => {
         setSelectedProject(INIT_SELECTEDPROJECT);
+        setSelectedProjectRegion(null);
     }, [props.region]);
 
     const showProjectDetails = () => {
-        return selectedProject != null ? true : false;
+        return selectedProject != null && selectedProjectRegion === props.region;
     };
 
     const projectChangedHandler = (value: ProjectMetadata) => {
         setSelectedProject(value);
+        setSelectedProjectRegion(props.region);
     };
 
     const rackSelectedHandler = (value: any) => {
